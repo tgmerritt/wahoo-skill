@@ -1,0 +1,44 @@
+# Secrets — never commit
+*.env
+.env
+.env.*
+secrets/
+*.token
+*tokens*.json
+wahoo_tokens.json
+
+# Local data — never commit
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.fit
+wahoo_fit/
+training/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.venv/
+venv/
+env/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Build / publish artifacts
+dist/
+build/
+*.tar.gz
+.clawhub/
+_meta.json
