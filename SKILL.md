@@ -1,15 +1,31 @@
 ---
-name: wahoo
-description: Load and analyze Wahoo Fitness Cloud workouts — fetch metadata, download FIT files, parse power/HR/cadence/GPS data
+name: wahoo-cloud
+description: Wahoo Fitness Cloud API — fetch workouts, download FIT files, parse power/HR/cadence/GPS into local SQLite for analysis
 homepage: https://cloud-api.wahooligan.com/
-metadata: {"clawdbot":{"emoji":"🚴","requires":{"bins":["curl","python3"],"env":["WAHOO_ACCESS_TOKEN"]},"primaryEnv":"WAHOO_ACCESS_TOKEN"}}
+metadata: {"clawdbot":{"emoji":"🚴","requires":{"bins":["python3"],"env":["WAHOO_CLIENT_ID","WAHOO_CLIENT_SECRET"]},"primaryEnv":"WAHOO_CLIENT_ID"}}
 ---
 
-# Wahoo Skill
+# Wahoo Cloud API Skill
 
-Programmatic access to the Wahoo Fitness Cloud API for ELEMNT BOLT/ROAM/ACE head units. Fetches workout metadata, downloads FIT files, and parses ride data (power, cadence, HR, GPS, elevation).
+Programmatic access to the Wahoo Fitness Cloud API for ELEMNT BOLT/ROAM/ACE head units. Fetches workout metadata, downloads FIT files from Wahoo's CDN, and parses ride data (power, cadence, HR, GPS, elevation) into a local SQLite database.
 
-API base: `https://api.wahooligan.com`. All workout endpoints under `/v1/workouts`. OAuth2 with `offline_data` scope yields a long-lived refresh token; access tokens expire after ~2 hours.
+API base: `https://api.wahooligan.com`. Workout endpoints live under `/v1/workouts`. OAuth2 with the `offline_data` scope yields a long-lived refresh token; access tokens expire after ~2 hours and the skill auto-refreshes on 401.
+
+## Agent quickstart (read this first)
+
+If you're an agent invoking this skill on behalf of a user:
+
+| User asks | Run this |
+|---|---|
+| "Sync my Wahoo workouts" / "Pull new rides" | `python3 {baseDir}/scripts/fetch_workouts.py` |
+| "Show recent rides" / "Last week's training" | Query `~/.openclaw/workspace/training/wahoo.db` (or `$WAHOO_TRAINING_DIR/wahoo.db`) — schema below |
+| "Parse this FIT file" | `python3 {baseDir}/scripts/parse_fit.py PATH.fit [--summary-only]` |
+| "Set up Wahoo" / "Connect my Wahoo" | Walk the user through Setup §1–3 below; then run `python3 {baseDir}/scripts/oauth_setup.py` |
+| "Refresh my Wahoo token" | `bash {baseDir}/scripts/refresh_token.sh` (only needed if auto-refresh fails) |
+
+The fetch script is **idempotent** — safe to run on a heartbeat. It skips workouts already fully synced (`fit_parsed_at IS NOT NULL`). Sandbox rate limits (25 req / 5 min) trigger automatic backoff, so a first sync of a long history may take many minutes.
+
+The skill **cannot** ship credentials. Each user needs their own Wahoo developer app — no shortcut. Setup is a one-time browser handshake.
 
 ## Setup
 

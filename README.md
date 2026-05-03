@@ -123,7 +123,7 @@ FIT downloads go through Wahoo's CDN, not the API, and don't count against your 
 ```bash
 clawhub login
 clawhub publish . \
-  --slug wahoo \
+  --slug wahoo-cloud \
   --name "Wahoo Fitness Cloud API" \
   --version 0.1.0 \
   --changelog "Initial release: OAuth2, workout fetch, FIT download/parse, SQLite sync"

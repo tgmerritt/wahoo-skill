@@ -1,7 +1,7 @@
 {
   "skills": {
     "entries": {
-      "wahoo": {
+      "wahoo-cloud": {
         "enabled": true,
         "env": {
           "WAHOO_CLIENT_ID": "your-client-id-from-developers.wahooligan.com",
