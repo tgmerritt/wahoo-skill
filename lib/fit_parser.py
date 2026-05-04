@@ -22,7 +22,7 @@ def _ensure_fitparse():
         import fitparse  # type: ignore
     except ImportError as e:
         raise RuntimeError(
-            "fitparse not installed. Run: pip install --user fitparse"
+            "fitparse not installed. Run: pip install --user 'fitparse>=1.2,<2'"
         ) from e
     return fitparse
 

@@ -180,5 +180,24 @@ def access_token() -> str:
     return token
 
 
+def _redacted_status() -> dict:
+    """Return token-file metadata without exposing token values."""
+    t = load_tokens()
+    if not t:
+        return {"present": False, "path": str(TOKENS_PATH)}
+    expires_at = t.get("expires_at")
+    return {
+        "present": True,
+        "path": str(TOKENS_PATH),
+        "has_access_token": bool(t.get("access_token")),
+        "has_refresh_token": bool(t.get("refresh_token")),
+        "expires_at": expires_at,
+        "expires_in_s": (expires_at - int(time.time())) if expires_at else None,
+        "scope": t.get("scope"),
+        "token_type": t.get("token_type"),
+    }
+
+
 if __name__ == "__main__":
-    print(json.dumps(load_tokens(), indent=2))
+    # Never dump raw tokens to stdout/logs. Print redacted status only.
+    print(json.dumps(_redacted_status(), indent=2))

@@ -32,7 +32,7 @@ Wahoo ELEMNT BOLT, ROAM, and ACE generate gold-standard cycling telemetry — po
 ### 2. Install dependencies
 
 ```bash
-pip install --user fitparse
+pip install --user 'fitparse>=1.2,<2'
 ```
 
 (`fitparse` is the only Python dependency. `curl` is needed for the shell refresh helper.)
@@ -134,9 +134,11 @@ clawhub publish . \
 ## Security
 
 - Tokens are stored at `~/.openclaw/secrets/wahoo_tokens.json` with mode `0600`.
-- `client_id` and `client_secret` come from environment variables (or `~/.clawdbot/clawdbot.json`) — never hardcoded in source.
+- `client_id` and `client_secret` come from environment variables, or `~/.openclaw/secrets/wahoo.env` (auto-loaded by `wahoo_auth.py` if env is empty), or `~/.clawdbot/clawdbot.json` — never hardcoded in source. Never paste these into agent chat windows or third-party tools; provide them only to local config files you control.
 - FIT files live locally; nothing is uploaded anywhere unless you explicitly add an upload step.
 - `.gitignore` blocks `*.env`, `*.db`, `*.fit`, and `*tokens*.json` — verify before committing if you fork.
+- The local `wahoo.db` and `wahoo_fit/` directory contain GPS, heart-rate, and power history. They inherit your training-dir permissions (default `~/.openclaw/workspace/training/`). Tighten with `chmod 700 ~/.openclaw/workspace/training` if other local users share the machine.
+- `python3 lib/wahoo_auth.py` prints redacted token-file status only (presence, expiry, scope). It never echoes the access or refresh token values.
 
 ## Contributing
 
