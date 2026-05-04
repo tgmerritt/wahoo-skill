@@ -22,19 +22,55 @@ DEFAULT_SCOPES = "workouts_read offline_data user_read"
 DEFAULT_REDIRECT_URI = "https://localhost:8080/"
 
 TOKENS_PATH = Path(os.path.expanduser("~/.openclaw/secrets/wahoo_tokens.json"))
+DEFAULT_ENV_FILE = Path(os.path.expanduser("~/.openclaw/secrets/wahoo.env"))
 
 
 class WahooAuthError(RuntimeError):
     pass
 
 
+def _maybe_load_dotenv() -> None:
+    """Populate WAHOO_* env vars from ~/.openclaw/secrets/wahoo.env (or
+    $WAHOO_ENV_FILE) if they aren't already set. No-op if the file is missing
+    or all needed vars are already in os.environ. Lets agents (e.g. Puck)
+    invoke the skill without having to source the env file in their shell.
+    """
+    if os.environ.get("WAHOO_CLIENT_ID") and os.environ.get("WAHOO_CLIENT_SECRET"):
+        return
+    env_path = Path(
+        os.environ.get("WAHOO_ENV_FILE", str(DEFAULT_ENV_FILE))
+    ).expanduser()
+    if not env_path.exists():
+        return
+    try:
+        text = env_path.read_text()
+    except OSError:
+        return
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[7:].lstrip()
+        if "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+            value = value[1:-1]
+        if key.startswith("WAHOO_") and key not in os.environ:
+            os.environ[key] = value
+
+
 def _client_credentials() -> tuple[str, str, str, str]:
+    _maybe_load_dotenv()
     client_id = os.environ.get("WAHOO_CLIENT_ID")
     client_secret = os.environ.get("WAHOO_CLIENT_SECRET")
     if not client_id or not client_secret:
         raise WahooAuthError(
-            "Set WAHOO_CLIENT_ID and WAHOO_CLIENT_SECRET in env or "
-            "~/.clawdbot/clawdbot.json"
+            "Set WAHOO_CLIENT_ID and WAHOO_CLIENT_SECRET in env, in "
+            "~/.openclaw/secrets/wahoo.env, or in ~/.clawdbot/clawdbot.json"
         )
     redirect_uri = os.environ.get("WAHOO_REDIRECT_URI", DEFAULT_REDIRECT_URI)
     scopes = os.environ.get("WAHOO_SCOPES", DEFAULT_SCOPES)

@@ -27,6 +27,8 @@ The fetch script is **idempotent** — safe to run on a heartbeat. It skips work
 
 The skill **cannot** ship credentials. Each user needs their own Wahoo developer app — no shortcut. Setup is a one-time browser handshake.
 
+**Credential auto-loading:** if `WAHOO_CLIENT_ID` / `WAHOO_CLIENT_SECRET` aren't in the calling shell, `wahoo_auth.py` automatically reads them from `~/.openclaw/secrets/wahoo.env` (override path with `$WAHOO_ENV_FILE`). This means an OpenClaw agent can invoke `fetch_workouts.py` without sourcing anything — token refresh just works.
+
 ## Setup
 
 ### 1. Register a Wahoo Developer App
