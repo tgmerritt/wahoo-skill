@@ -71,8 +71,9 @@ def _request(
         if e.code == 429 and not retried:
             reset = int(e.headers.get("X-RateLimit-Reset", "60") or "60")
             wait = max(1, reset - int(time.time())) if reset > 10**9 else reset
-            print(f"  ⏳ rate-limited; sleeping {wait}s", flush=True)
-            time.sleep(min(wait, 300))
+            wait = min(wait, 300)
+            print(f"  ⏳ rate-limited; sleeping {wait}s (Ctrl+C to abort)", flush=True)
+            time.sleep(wait)
             return _request(
                 method, path, params=params, body=body, retried=True
             )

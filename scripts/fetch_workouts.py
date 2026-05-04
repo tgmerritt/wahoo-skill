@@ -331,4 +331,8 @@ def _print_recent(conn: sqlite3.Connection) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n⏹  Interrupted — partial progress saved to DB.", flush=True)
+        sys.exit(130)
