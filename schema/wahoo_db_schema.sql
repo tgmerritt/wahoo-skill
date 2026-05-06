@@ -68,3 +68,42 @@ CREATE TABLE IF NOT EXISTS sync_log (
     fit_downloaded INTEGER,
     status TEXT DEFAULT 'OK'            -- OK, ERROR, PARTIAL
 );
+
+CREATE TABLE IF NOT EXISTS laps (
+    workout_id INTEGER,
+    lap_number INTEGER,                 -- 1-indexed, matches FIT order
+    start_time TEXT,
+    end_time TEXT,
+    elapsed_s REAL,
+    timer_s REAL,
+    distance_m REAL,
+    ascent_m REAL,
+    descent_m REAL,
+    calories REAL,
+    work_j REAL,
+    avg_power_w REAL,
+    np_w REAL,                          -- normalized power
+    max_power_w REAL,
+    avg_cadence REAL,
+    max_cadence REAL,
+    avg_speed_ms REAL,
+    max_speed_ms REAL,
+    avg_grade REAL,
+    max_pos_grade REAL,
+    max_neg_grade REAL,
+    avg_altitude REAL,
+    max_altitude REAL,
+    min_altitude REAL,
+    avg_temperature REAL,
+    max_temperature REAL,
+    left_right_balance REAL,
+    time_in_zone1 REAL,                 -- seconds in power zone 1 (<55% FTP)
+    time_in_zone2 REAL,                 -- 55–75% FTP
+    time_in_zone3 REAL,                 -- 75–85% FTP
+    time_in_zone4 REAL,                 -- 85–95% FTP
+    time_in_zone5 REAL,                 -- 95–110% FTP
+    time_in_zone6 REAL,                 -- >110% FTP
+    FOREIGN KEY (workout_id) REFERENCES workouts(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_laps_workout ON laps(workout_id);

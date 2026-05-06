@@ -58,6 +58,15 @@ def _to_float(v) -> float | None:
         return None
 
 
+def _iso(dt) -> str | None:
+    if dt is None:
+        return None
+    try:
+        return dt.isoformat() if hasattr(dt, "isoformat") else str(dt)
+    except Exception:
+        return str(dt)
+
+
 def upsert_metadata(conn: sqlite3.Connection, w: dict) -> bool:
     """Insert/update metadata from list or detail. Returns True if new row."""
     summary = w.get("workout_summary") or {}
@@ -200,6 +209,65 @@ def store_fit_parse(
             workout_id,
         ),
     )
+    conn.commit()
+    store_laps(conn, workout_id, parsed.get("laps", []))
+
+
+def store_laps(conn: sqlite3.Connection, workout_id: int, laps: list) -> None:
+    if not laps:
+        return
+    cur = conn.cursor()
+    cur.execute("DELETE FROM laps WHERE workout_id = ?", (workout_id,))
+    for i, lap in enumerate(laps):
+        cur.execute(
+            """
+            INSERT INTO laps (
+                workout_id, lap_number, start_time, end_time,
+                elapsed_s, timer_s, distance_m, ascent_m, descent_m,
+                calories, work_j, avg_power_w, np_w, max_power_w,
+                avg_cadence, max_cadence, avg_speed_ms, max_speed_ms,
+                avg_grade, max_pos_grade, max_neg_grade,
+                avg_altitude, max_altitude, min_altitude,
+                avg_temperature, max_temperature, left_right_balance,
+                time_in_zone1, time_in_zone2, time_in_zone3,
+                time_in_zone4, time_in_zone5, time_in_zone6
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """,
+            (
+                workout_id, i + 1,
+                _iso(lap.get("start_time")),
+                _iso(lap.get("end_time")),
+                _to_float(lap.get("total_elapsed_time")),
+                _to_float(lap.get("total_timer_time")),
+                _to_float(lap.get("total_distance")),
+                _to_float(lap.get("total_ascent")),
+                _to_float(lap.get("total_descent")),
+                _to_float(lap.get("total_calories")),
+                _to_float(lap.get("total_work")),
+                _to_float(lap.get("avg_power")),        # FIT field: avg_power, not average_power
+                _to_float(lap.get("normalized_power")),
+                _to_float(lap.get("max_power")),
+                _to_float(lap.get("avg_cadence")),
+                _to_float(lap.get("max_cadence")),
+                _to_float(lap.get("avg_speed")),
+                _to_float(lap.get("max_speed")),
+                _to_float(lap.get("avg_grade")),
+                _to_float(lap.get("max_pos_grade")),
+                _to_float(lap.get("max_neg_grade")),
+                _to_float(lap.get("avg_altitude")),
+                _to_float(lap.get("enhanced_max_altitude")),
+                _to_float(lap.get("enhanced_min_altitude")),
+                _to_float(lap.get("avg_temperature")),
+                _to_float(lap.get("max_temperature")),
+                _to_float(lap.get("left_right_balance")),
+                _to_float(lap.get("time_in_zone1")),
+                _to_float(lap.get("time_in_zone2")),
+                _to_float(lap.get("time_in_zone3")),
+                _to_float(lap.get("time_in_zone4")),
+                _to_float(lap.get("time_in_zone5")),
+                _to_float(lap.get("time_in_zone6")),
+            ),
+        )
     conn.commit()
 
 

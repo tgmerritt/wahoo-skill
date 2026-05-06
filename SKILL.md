@@ -19,6 +19,7 @@ If you're an agent invoking this skill on behalf of a user:
 |---|---|
 | "Sync my Wahoo workouts" / "Pull new rides" | `python3 {baseDir}/scripts/fetch_workouts.py` |
 | "Show recent rides" / "Last week's training" | Query `~/.openclaw/workspace/training/wahoo.db` (or `$WAHOO_TRAINING_DIR/wahoo.db`) — schema below |
+| "Show lap splits for a ride" | `SELECT * FROM laps WHERE workout_id = <id> ORDER BY lap_number` |
 | "Parse this FIT file" | `python3 {baseDir}/scripts/parse_fit.py PATH.fit [--summary-only]` |
 | "Set up Wahoo" / "Connect my Wahoo" | Walk the user through Setup §1–3 below; then run `python3 {baseDir}/scripts/oauth_setup.py` |
 | "Refresh my Wahoo token" | `bash {baseDir}/scripts/refresh_token.sh` (only needed if auto-refresh fails) |

@@ -33,6 +33,7 @@ def parse(path: str | Path) -> dict[str, Any]:
 
     session = _first_session(fit)
     records = list(_iter_records(fit))
+    lap_data = list(_iter_laps(fit))
 
     summary = {
         "fit_path": str(path),
@@ -58,7 +59,7 @@ def parse(path: str | Path) -> dict[str, Any]:
         "sub_sport": session.get("sub_sport") if session else None,
         "record_count": len(records),
     }
-    return {"summary": summary, "records": records}
+    return {"summary": summary, "records": records, "laps": lap_data}
 
 
 def _first_session(fit) -> dict | None:
@@ -80,10 +81,46 @@ def _iter_records(fit) -> Iterator[dict]:
         yield d
 
 
+def _iter_laps(fit) -> Iterator[dict]:
+    for msg in fit.get_messages("lap"):
+        d: dict[str, Any] = {}
+        tz = None
+        for f in msg.fields:
+            if f.name == "time_in_power_zone":
+                v = f.value
+                if isinstance(v, tuple) and len(v) == 6:
+                    tz = [float(x) for x in v]
+                elif isinstance(v, int):
+                    tz = [float(v)] + [0.0] * 5
+                continue
+            v = f.value
+            if f.name == "timestamp":
+                d["end_time"] = _iso(v)
+            elif f.name == "start_time":
+                d["start_time"] = _iso(v)
+            else:
+                d[f.name] = _f_safe(v)
+        for i, key in enumerate(
+            ["time_in_zone1", "time_in_zone2", "time_in_zone3",
+             "time_in_zone4", "time_in_zone5", "time_in_zone6"]
+        ):
+            d[key] = tz[i] if tz else None
+        yield d
+
+
 def _f(session: dict | None, key: str) -> float | None:
     if not session:
         return None
     v = session.get(key)
+    if v is None:
+        return None
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _f_safe(v) -> float | None:
     if v is None:
         return None
     try:
