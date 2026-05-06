@@ -20,6 +20,11 @@ If you're an agent invoking this skill on behalf of a user:
 | "Sync my Wahoo workouts" / "Pull new rides" | `python3 {baseDir}/scripts/fetch_workouts.py` |
 | "Show recent rides" / "Last week's training" | Query `~/.openclaw/workspace/training/wahoo.db` (or `$WAHOO_TRAINING_DIR/wahoo.db`) — schema below |
 | "Show lap splits for a ride" | `SELECT * FROM laps WHERE workout_id = <id> ORDER BY lap_number` |
+| "Show power / HR time series for a ride" | `SELECT timestamp, power_w, heart_rate, cadence, speed_ms FROM records WHERE workout_id = <id> ORDER BY timestamp` |
+| "Show GPS track for a ride" | `SELECT timestamp, position_lat_deg, position_long_deg, enhanced_altitude_m FROM records WHERE workout_id = <id> AND position_lat_deg IS NOT NULL ORDER BY timestamp` |
+| "Show sensors / devices on a ride" | `SELECT manufacturer, product_name, serial_number, battery_status FROM device_info WHERE workout_id = <id>` |
+| "Show power or HR zone thresholds" | `SELECT zone_type, zone_number, high_value FROM zones WHERE workout_id = <id> ORDER BY zone_type, zone_number` |
+| "Show FTP / threshold power" | `SELECT id, starts, fit_threshold_power_w FROM workouts ORDER BY starts DESC` |
 | "Parse this FIT file" | `python3 {baseDir}/scripts/parse_fit.py PATH.fit [--summary-only]` |
 | "Set up Wahoo" / "Connect my Wahoo" | Walk the user through Setup §1–3 below; then run `python3 {baseDir}/scripts/oauth_setup.py` |
 | "Refresh my Wahoo token" | `bash {baseDir}/scripts/refresh_token.sh` (only needed if auto-refresh fails) |

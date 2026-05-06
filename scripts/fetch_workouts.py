@@ -45,8 +45,58 @@ def init_db() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
     with open(SCHEMA_PATH) as f:
         conn.executescript(f.read())
+    _run_migrations(conn)
     conn.commit()
     return conn
+
+
+# Keep in sync with schema/wahoo_db_schema.sql — both must list every column.
+_MIGRATIONS: list[tuple[str, str, str]] = [
+    ("workouts", "fit_threshold_power_w",     "REAL"),
+    ("workouts", "fit_num_laps",              "INTEGER"),
+    ("workouts", "fit_start_time",            "TEXT"),
+    ("workouts", "fit_avg_altitude_m",        "REAL"),
+    ("workouts", "fit_max_altitude_m",        "REAL"),
+    ("workouts", "fit_min_altitude_m",        "REAL"),
+    ("workouts", "fit_avg_grade",             "REAL"),
+    ("workouts", "fit_max_pos_grade",         "REAL"),
+    ("workouts", "fit_max_neg_grade",         "REAL"),
+    ("workouts", "fit_avg_temperature",       "REAL"),
+    ("workouts", "fit_max_temperature",       "REAL"),
+    ("workouts", "fit_left_right_balance",    "REAL"),
+    ("workouts", "fit_session_time_in_zone1", "REAL"),
+    ("workouts", "fit_session_time_in_zone2", "REAL"),
+    ("workouts", "fit_session_time_in_zone3", "REAL"),
+    ("workouts", "fit_session_time_in_zone4", "REAL"),
+    ("workouts", "fit_session_time_in_zone5", "REAL"),
+    ("workouts", "fit_session_time_in_zone6", "REAL"),
+    ("laps",     "avg_heart_rate",            "REAL"),
+    ("laps",     "max_heart_rate",            "REAL"),
+    ("laps",     "enhanced_avg_altitude",     "REAL"),
+    ("laps",     "lap_trigger",               "TEXT"),
+]
+
+
+def _run_migrations(conn: sqlite3.Connection) -> None:
+    cur = conn.cursor()
+    for table, col, decl in _MIGRATIONS:
+        try:
+            cur.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+        except sqlite3.OperationalError as e:
+            if "duplicate column name" not in str(e).lower():
+                raise
+    # One-shot v0.1.8 backfill: reset fit_parsed_at on rows that predate this
+    # version so the next sync re-parses from disk (no re-download) and fills
+    # all new columns + new tables. Idempotent: once populated, sentinel is set.
+    cur.execute("""
+        UPDATE workouts
+        SET fit_parsed_at = NULL
+        WHERE fit_path IS NOT NULL
+          AND fit_parsed_at IS NOT NULL
+          AND fit_threshold_power_w IS NULL
+          AND fit_num_laps IS NULL
+    """)
+    conn.commit()
 
 
 def _to_float(v) -> float | None:
@@ -170,6 +220,7 @@ def store_fit_parse(
         UPDATE workouts SET
             fit_path = ?,
             fit_parsed_at = datetime('now'),
+            fit_start_time = ?,
             fit_total_distance_m = ?,
             fit_total_elapsed_s = ?,
             fit_total_timer_s = ?,
@@ -178,18 +229,36 @@ def store_fit_parse(
             fit_avg_power_w = ?,
             fit_max_power_w = ?,
             fit_normalized_power_w = ?,
+            fit_threshold_power_w = ?,
             fit_avg_heart_rate = ?,
             fit_max_heart_rate = ?,
             fit_avg_cadence = ?,
             fit_max_cadence = ?,
             fit_avg_speed_ms = ?,
             fit_max_speed_ms = ?,
+            fit_avg_altitude_m = ?,
+            fit_max_altitude_m = ?,
+            fit_min_altitude_m = ?,
+            fit_avg_grade = ?,
+            fit_max_pos_grade = ?,
+            fit_max_neg_grade = ?,
+            fit_avg_temperature = ?,
+            fit_max_temperature = ?,
+            fit_left_right_balance = ?,
             fit_calories = ?,
-            fit_record_count = ?
+            fit_record_count = ?,
+            fit_num_laps = ?,
+            fit_session_time_in_zone1 = ?,
+            fit_session_time_in_zone2 = ?,
+            fit_session_time_in_zone3 = ?,
+            fit_session_time_in_zone4 = ?,
+            fit_session_time_in_zone5 = ?,
+            fit_session_time_in_zone6 = ?
         WHERE id = ?
         """,
         (
             str(fit_path),
+            s.get("start_time"),
             s.get("total_distance_m"),
             s.get("total_elapsed_time_s"),
             s.get("total_timer_time_s"),
@@ -198,19 +267,39 @@ def store_fit_parse(
             s.get("avg_power_w"),
             s.get("max_power_w"),
             s.get("normalized_power_w"),
+            s.get("threshold_power_w"),
             s.get("avg_heart_rate"),
             s.get("max_heart_rate"),
             s.get("avg_cadence"),
             s.get("max_cadence"),
             s.get("avg_speed_ms"),
             s.get("max_speed_ms"),
+            s.get("avg_altitude_m"),
+            s.get("max_altitude_m"),
+            s.get("min_altitude_m"),
+            s.get("avg_grade"),
+            s.get("max_pos_grade"),
+            s.get("max_neg_grade"),
+            s.get("avg_temperature"),
+            s.get("max_temperature"),
+            s.get("left_right_balance"),
             s.get("total_calories"),
             s.get("record_count"),
+            s.get("num_laps"),
+            s.get("session_time_in_zone1"),
+            s.get("session_time_in_zone2"),
+            s.get("session_time_in_zone3"),
+            s.get("session_time_in_zone4"),
+            s.get("session_time_in_zone5"),
+            s.get("session_time_in_zone6"),
             workout_id,
         ),
     )
     conn.commit()
     store_laps(conn, workout_id, parsed.get("laps", []))
+    store_records(conn, workout_id, parsed.get("records", []))
+    store_devices(conn, workout_id, parsed.get("devices", []))
+    store_zones(conn, workout_id, parsed.get("zones", []))
 
 
 def store_laps(conn: sqlite3.Connection, workout_id: int, laps: list) -> None:
@@ -225,13 +314,15 @@ def store_laps(conn: sqlite3.Connection, workout_id: int, laps: list) -> None:
                 workout_id, lap_number, start_time, end_time,
                 elapsed_s, timer_s, distance_m, ascent_m, descent_m,
                 calories, work_j, avg_power_w, np_w, max_power_w,
+                avg_heart_rate, max_heart_rate,
                 avg_cadence, max_cadence, avg_speed_ms, max_speed_ms,
+                avg_altitude, enhanced_avg_altitude, max_altitude, min_altitude,
                 avg_grade, max_pos_grade, max_neg_grade,
-                avg_altitude, max_altitude, min_altitude,
                 avg_temperature, max_temperature, left_right_balance,
+                lap_trigger,
                 time_in_zone1, time_in_zone2, time_in_zone3,
                 time_in_zone4, time_in_zone5, time_in_zone6
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 workout_id, i + 1,
@@ -247,19 +338,23 @@ def store_laps(conn: sqlite3.Connection, workout_id: int, laps: list) -> None:
                 _to_float(lap.get("avg_power")),        # FIT field: avg_power, not average_power
                 _to_float(lap.get("normalized_power")),
                 _to_float(lap.get("max_power")),
+                _to_float(lap.get("avg_heart_rate")),
+                _to_float(lap.get("max_heart_rate")),
                 _to_float(lap.get("avg_cadence")),
                 _to_float(lap.get("max_cadence")),
                 _to_float(lap.get("avg_speed")),
                 _to_float(lap.get("max_speed")),
+                _to_float(lap.get("avg_altitude")),
+                _to_float(lap.get("enhanced_avg_altitude")),
+                _to_float(lap.get("enhanced_max_altitude")),
+                _to_float(lap.get("enhanced_min_altitude")),
                 _to_float(lap.get("avg_grade")),
                 _to_float(lap.get("max_pos_grade")),
                 _to_float(lap.get("max_neg_grade")),
-                _to_float(lap.get("avg_altitude")),
-                _to_float(lap.get("enhanced_max_altitude")),
-                _to_float(lap.get("enhanced_min_altitude")),
                 _to_float(lap.get("avg_temperature")),
                 _to_float(lap.get("max_temperature")),
                 _to_float(lap.get("left_right_balance")),
+                lap.get("lap_trigger"),
                 _to_float(lap.get("time_in_zone1")),
                 _to_float(lap.get("time_in_zone2")),
                 _to_float(lap.get("time_in_zone3")),
@@ -268,6 +363,103 @@ def store_laps(conn: sqlite3.Connection, workout_id: int, laps: list) -> None:
                 _to_float(lap.get("time_in_zone6")),
             ),
         )
+    conn.commit()
+
+
+def store_records(conn: sqlite3.Connection, workout_id: int, records: list) -> None:
+    if not records:
+        return
+    cur = conn.cursor()
+    cur.execute("DELETE FROM records WHERE workout_id = ?", (workout_id,))
+    rows = [
+        (
+            workout_id,
+            r.get("timestamp"),
+            _to_float(r.get("power")),
+            _to_float(r.get("heart_rate")),
+            _to_float(r.get("cadence")),
+            _to_float(r.get("speed")),
+            _to_float(r.get("enhanced_speed")),
+            _to_float(r.get("distance")),
+            _to_float(r.get("altitude")),
+            _to_float(r.get("enhanced_altitude")),
+            _to_float(r.get("position_lat")),       # already deg from parser
+            _to_float(r.get("position_long")),
+            _to_float(r.get("grade")),
+            _to_float(r.get("temperature")),
+            _to_float(r.get("battery_soc")),
+            _to_float(r.get("gps_accuracy")),
+            _to_float(r.get("left_right_balance")),
+            _to_float(r.get("ascent")),
+            _to_float(r.get("descent")),
+            _to_float(r.get("calories")),
+        )
+        for r in records
+    ]
+    cur.executemany(
+        """INSERT INTO records (
+            workout_id, timestamp, power_w, heart_rate, cadence,
+            speed_ms, enhanced_speed_ms, distance_m, altitude_m, enhanced_altitude_m,
+            position_lat_deg, position_long_deg, grade, temperature, battery_soc,
+            gps_accuracy, left_right_balance, ascent_m, descent_m, calories
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        rows,
+    )
+    conn.commit()
+
+
+def store_devices(conn: sqlite3.Connection, workout_id: int, devices: list) -> None:
+    if not devices:
+        return
+    cur = conn.cursor()
+    cur.execute("DELETE FROM device_info WHERE workout_id = ?", (workout_id,))
+    rows = [
+        (
+            workout_id,
+            d.get("device_index"),
+            d.get("timestamp"),
+            str(d["manufacturer"]) if d.get("manufacturer") is not None else None,
+            str(d["product"]) if d.get("product") is not None else None,
+            d.get("product_name"),
+            str(d["serial_number"]) if d.get("serial_number") is not None else None,
+            str(d["software_version"]) if d.get("software_version") is not None else None,
+            str(d["hardware_version"]) if d.get("hardware_version") is not None else None,
+            str(d["battery_status"]) if d.get("battery_status") is not None else None,
+            _to_float(d.get("charge")),
+            str(d["device_type"]) if d.get("device_type") is not None else None,
+            str(d["source_type"]) if d.get("source_type") is not None else None,
+            d.get("ant_device_number"),
+            d.get("descriptor"),
+            _to_float(d.get("crank_length")),
+        )
+        for d in devices
+    ]
+    cur.executemany(
+        """INSERT INTO device_info (
+            workout_id, device_index, timestamp, manufacturer, product, product_name,
+            serial_number, software_version, hardware_version, battery_status,
+            battery_charge_pct, device_type, source_type, ant_device_number,
+            descriptor, crank_length_mm
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        rows,
+    )
+    conn.commit()
+
+
+def store_zones(conn: sqlite3.Connection, workout_id: int, zones: list) -> None:
+    if not zones:
+        return
+    cur = conn.cursor()
+    cur.execute("DELETE FROM zones WHERE workout_id = ?", (workout_id,))
+    rows = [
+        (workout_id, z["zone_type"], z.get("zone_number"), z.get("high_value"))
+        for z in zones
+        if z.get("zone_number") is not None
+    ]
+    cur.executemany(
+        "INSERT INTO zones (workout_id, zone_type, zone_number, high_value) VALUES (?,?,?,?)",
+        rows,
+    )
     conn.commit()
 
 
