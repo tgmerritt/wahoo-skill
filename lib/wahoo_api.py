@@ -85,7 +85,7 @@ def get_user() -> dict:
     return payload
 
 
-def list_workouts(page: int = 1, per_page: int = 30) -> dict:
+def list_workouts(page: int = 1, per_page: int = 1) -> dict:
     payload, _ = _request(
         "GET",
         "/v1/workouts",
@@ -94,7 +94,7 @@ def list_workouts(page: int = 1, per_page: int = 30) -> dict:
     return payload
 
 
-def iter_workouts(per_page: int = 30, max_pages: int = 200) -> Iterator[dict]:
+def iter_workouts(per_page: int = 1, max_pages: int = 200) -> Iterator[dict]:
     """Yield workout summaries (with workout_summary=null per Wahoo's API)."""
     page = 1
     while page <= max_pages:

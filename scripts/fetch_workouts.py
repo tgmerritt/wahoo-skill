@@ -495,7 +495,7 @@ def main() -> None:
     seen_ids: list[int] = []
     new_count = 0
     print("📄 Listing workouts…")
-    for w in wahoo_api.iter_workouts(per_page=30):
+    for w in wahoo_api.iter_workouts(per_page=1):
         seen_ids.append(w["id"])
         if upsert_metadata(conn, w):
             new_count += 1
