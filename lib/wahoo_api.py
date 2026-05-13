@@ -23,6 +23,11 @@ import wahoo_auth  # noqa: E402
 API_BASE = "https://api.wahooligan.com"
 USER_AGENT = "openclaw-wahoo-skill/0.1.0"
 
+# Wahoo sandbox: 25 req/5-min, 100/hr, 250/day.
+# Sleep 13s between calls to stay safely under the 5-min window (~23 req/5-min).
+_REQUEST_INTERVAL = 13.0
+_last_request_at: float = 0.0
+
 
 class WahooAPIError(RuntimeError):
     def __init__(self, status: int, body: str):
@@ -40,6 +45,12 @@ def _request(
     token: Optional[str] = None,
     retried: bool = False,
 ) -> tuple[dict, dict]:
+    global _last_request_at
+    elapsed = time.time() - _last_request_at
+    if elapsed < _REQUEST_INTERVAL:
+        time.sleep(_REQUEST_INTERVAL - elapsed)
+    _last_request_at = time.time()
+
     if token is None:
         token = wahoo_auth.access_token()
 
@@ -85,7 +96,7 @@ def get_user() -> dict:
     return payload
 
 
-def list_workouts(page: int = 1, per_page: int = 1) -> dict:
+def list_workouts(page: int = 1, per_page: int = 30) -> dict:
     payload, _ = _request(
         "GET",
         "/v1/workouts",
@@ -94,7 +105,7 @@ def list_workouts(page: int = 1, per_page: int = 1) -> dict:
     return payload
 
 
-def iter_workouts(per_page: int = 1, max_pages: int = 200) -> Iterator[dict]:
+def iter_workouts(per_page: int = 30, max_pages: int = 200) -> Iterator[dict]:
     """Yield workout summaries (with workout_summary=null per Wahoo's API)."""
     page = 1
     while page <= max_pages:
