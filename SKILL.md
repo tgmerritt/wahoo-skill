@@ -1,11 +1,8 @@
 ---
 name: wahoo-cloud
 description: Access Wahoo Fitness Cloud API to fetch workouts, download FIT files, and analyze training data (power, HR, cadence, GPS).
-toolsets: [terminal, file, web]
-metadata:
-  version: 0.2.0
-  author: Tyler
-  capabilities: [workout_sync, fit_parsing, training_analysis]
+homepage: https://cloud-api.wahooligan.com/
+metadata: {"clawdbot":{"emoji":"🚴","requires":{"bins":["python3"],"env":["WAHOO_CLIENT_ID","WAHOO_CLIENT_SECRET"]},"primaryEnv":"WAHOO_CLIENT_ID"}}
 ---
 
 # Wahoo Cloud Skill
