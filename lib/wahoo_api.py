@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import wahoo_auth  # noqa: E402
 
 API_BASE = "https://api.wahooligan.com"
-USER_AGENT = "openclaw-wahoo-skill/0.1.0"
+USER_AGENT = "wahoo-skill/0.2.0"
 
 # Wahoo sandbox: 25 req/5-min, 100/hr, 250/day.
 # Sleep 13s between calls to stay safely under the 5-min window (~23 req/5-min).

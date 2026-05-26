@@ -2,9 +2,9 @@
 """Fetch Wahoo workouts → download FIT files → parse → upsert to SQLite.
 
 Default output (override any with env vars):
-  $WAHOO_TRAINING_DIR  (default: ~/.openclaw/workspace/training)
-    wahoo.db        SQLite store
-    wahoo_fit/      downloaded FIT files
+  $WAHOO_BASE_DIR  (default: ~/.wahoo)
+    wahoo.db        lives at $WAHOO_BASE_DIR/wahoo.db
+    wahoo_fit/      FIT files at $WAHOO_BASE_DIR/wahoo_fit/
 
 Behavior:
   - Lists all workouts via paginated /v1/workouts.
@@ -16,6 +16,7 @@ Behavior:
 
 from __future__ import annotations
 
+import argparse
 import os
 import sqlite3
 import sys
@@ -29,12 +30,9 @@ sys.path.insert(0, str(SKILL_ROOT / "lib"))
 import wahoo_api  # noqa: E402
 import wahoo_auth  # noqa: E402
 
-TRAINING_DIR = Path(
-    os.environ.get(
-        "WAHOO_TRAINING_DIR",
-        os.path.expanduser("~/.openclaw/workspace/training"),
-    )
-)
+BASE_DIR = Path(os.environ.get("WAHOO_BASE_DIR", os.path.expanduser("~/.wahoo"))).expanduser()
+
+TRAINING_DIR = BASE_DIR
 DB_PATH = TRAINING_DIR / "wahoo.db"
 FIT_DIR = TRAINING_DIR / "wahoo_fit"
 SCHEMA_PATH = SKILL_ROOT / "schema" / "wahoo_db_schema.sql"
@@ -482,6 +480,10 @@ def log_sync(
 
 
 def main() -> None:
+    p = argparse.ArgumentParser(description="Fetch Wahoo workouts")
+    p.add_argument("--limit", type=int, default=None, help="Process only the N most recent workouts (API returns newest first).")
+    args = p.parse_args()
+
     print("🚴 Wahoo DB Sync")
     try:
         wahoo_auth.access_token()
@@ -496,6 +498,8 @@ def main() -> None:
     new_count = 0
     print("📄 Listing workouts…")
     for w in wahoo_api.iter_workouts(per_page=30):
+        if args.limit is not None and len(seen_ids) >= args.limit:
+            break
         seen_ids.append(w["id"])
         if upsert_metadata(conn, w):
             new_count += 1

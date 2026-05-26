@@ -2,9 +2,9 @@
 """Interactive Wahoo OAuth2 setup.
 
 Prints the authorization URL, then prompts you to paste back either the
-full redirect URL (https://localhost:8080/?code=XXX) or just the code.
+full redirect URL (https://localhost:8080/?code=...) or just the code.
 Exchanges it for an access_token + refresh_token and writes both to
-~/.openclaw/secrets/wahoo_tokens.json.
+the configured secrets directory (defaults to ~/.wahoo/secrets/wahoo_tokens.json).
 """
 
 from __future__ import annotations

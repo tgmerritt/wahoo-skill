@@ -1,8 +1,8 @@
 """Wahoo OAuth2 token management.
 
 Loads client credentials from env (WAHOO_CLIENT_ID, WAHOO_CLIENT_SECRET,
-WAHOO_REDIRECT_URI), persists tokens to ~/.openclaw/secrets/wahoo_tokens.json
-(mode 0600), and auto-refreshes the access token when the API returns 401.
+WAHOO_REDIRECT_URI), persists tokens to a configurable secrets directory
+(defaults to ~/.wahoo/secrets/), and auto-refreshes the access token.
 """
 
 from __future__ import annotations
@@ -21,8 +21,10 @@ OAUTH_TOKEN_URL = "https://api.wahooligan.com/oauth/token"
 DEFAULT_SCOPES = "workouts_read offline_data user_read"
 DEFAULT_REDIRECT_URI = "https://localhost:8080/"
 
-TOKENS_PATH = Path(os.path.expanduser("~/.openclaw/secrets/wahoo_tokens.json"))
-DEFAULT_ENV_FILE = Path(os.path.expanduser("~/.openclaw/secrets/wahoo.env"))
+WAHOO_BASE_DIR = Path(os.environ.get("WAHOO_BASE_DIR", os.path.expanduser("~/.wahoo"))).expanduser()
+
+TOKENS_PATH = WAHOO_BASE_DIR / "secrets" / "wahoo_tokens.json"
+DEFAULT_ENV_FILE = WAHOO_BASE_DIR / "secrets" / "wahoo.env"
 
 
 class WahooAuthError(RuntimeError):
@@ -30,9 +32,9 @@ class WahooAuthError(RuntimeError):
 
 
 def _maybe_load_dotenv() -> None:
-    """Populate WAHOO_* env vars from ~/.openclaw/secrets/wahoo.env (or
+    """Populate WAHOO_* env vars from ~/.wahoo/secrets/wahoo.env (or
     $WAHOO_ENV_FILE) if they aren't already set. No-op if the file is missing
-    or all needed vars are already in os.environ. Lets agents (e.g. Puck)
+    or all needed vars are already in os.environ. Lets an agent
     invoke the skill without having to source the env file in their shell.
     """
     if os.environ.get("WAHOO_CLIENT_ID") and os.environ.get("WAHOO_CLIENT_SECRET"):
@@ -69,8 +71,7 @@ def _client_credentials() -> tuple[str, str, str, str]:
     client_secret = os.environ.get("WAHOO_CLIENT_SECRET")
     if not client_id or not client_secret:
         raise WahooAuthError(
-            "Set WAHOO_CLIENT_ID and WAHOO_CLIENT_SECRET in env, in "
-            "~/.openclaw/secrets/wahoo.env, or in ~/.clawdbot/clawdbot.json"
+            "Set WAHOO_CLIENT_ID and WAHOO_CLIENT_SECRET in env, or in " + str(WAHOO_BASE_DIR / "secrets" / "wahoo.env")
         )
     redirect_uri = os.environ.get("WAHOO_REDIRECT_URI", DEFAULT_REDIRECT_URI)
     scopes = os.environ.get("WAHOO_SCOPES", DEFAULT_SCOPES)
